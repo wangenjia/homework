@@ -81,11 +81,55 @@ function updateHUD(state) {
   hudMistake.textContent = state.mistakes_left;
 }
 
-function applyState(state) {
-  game.state = state;
-  renderBoard(state);
-  updateHUD(state);
-  busy = false;
+/* ---------------- 点击箭头 ---------------- */
+async function onArrowClick(r, c, el, dir) {
+  if (busy || !game || !game.state || game.state.locked) return;
+  busy = true;
+  const resp = await api('/api/click', { r, c });
+  if (!resp.ok) { busy = false; return; }
+  if (resp.result === 'blocked') {
+    handleBlocked(el, resp);
+  } else if (resp.result === 'flew') {
+    handleFlew(el, resp);
+  }
+}
+
+/* 被阻挡：抖动 /
+function handleBlocked(el, resp) {
+  
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+
+}
+
+/* 飞出：/
+function handleFlew(el, resp) {
+  const cell = game.cell;
+  const { dr, dc } = DIRS[resp.arrow.dir];
+  const rows = game.state.rows, cols = game.state.cols;
+
+  let dist;
+  if (dc > 0)      dist = (cols - resp.arrow.c + 1) * cell;
+  else if (dc < 0) dist = (resp.arrow.c + 2) * cell;
+  else if (dr > 0) dist = (rows - resp.arrow.r + 1) * cell;
+  else             dist = (resp.arrow.r + 2) * cell;
+
+  el.classList.add('flying');
+  el.style.pointerEvents = 'none';
+
+  requestAnimationFrame(() => {
+    el.style.transform = `translate(${dc * dist}px, ${dr * dist}px)`;
+    el.style.opacity = '0';
+  });
+
+  hudArrows.textContent  = resp.arrows_left;
+
+  setTimeout(() => {
+    el.remove();
+    game.state = resp.state;
+    busy = false;
+  }, 600);
 }
 
 /* ---------- 关卡启动 ---------- */
