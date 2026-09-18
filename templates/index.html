@@ -1,3 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>箭头大逃亡 · 益智小游戏</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    color: #e8ecff;
+    background: radial-gradient(1200px 640px at 15% -10%, #2a3566 0%, #141930 55%, #090c18 100%);
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+  }
+
+  .screen { display: none; width: 100%; }
+  .screen.active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    margin: auto;
+  }
+
+  /* ---------- 开始界面 ---------- */
+  .panel {
+    width: 100%;
+    max-width: 460px;
+    padding: 34px 26px 30px;
+    text-align: center;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+  }
+  .panel h1 {
+    margin: 0 0 8px;
+    font-size: 30px;
+    letter-spacing: 2px;
+    background: linear-gradient(120deg, #7dd3fc, #a78bfa 55%, #f0abfc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .panel .sub { margin: 0 0 20px; font-size: 14px; color: #9aa6d4; }
+
+  .rules {
+    margin: 0 0 26px;
+    padding: 16px 18px;
+    list-style: none;
+    text-align: left;
+    font-size: 13.5px;
+    line-height: 1.85;
+    color: #c3cbf0;
+    background: rgba(0, 0, 0, 0.22);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .rules li { position: relative; padding-left: 20px; }
+  .rules li::before {
+    content: "";
+    position: absolute;
+    left: 4px; top: 11px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #6d8cff;
+    box-shadow: 0 0 8px #6d8cff;
+  }
+
+  /* ---------- 按钮 ---------- */
+  .btn {
+    font-family: inherit;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 13px 30px;
+    transition: transform 0.14s, filter 0.14s, box-shadow 0.14s;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn.primary {
+    color: #fff;
+    background: linear-gradient(135deg, #4c7dff, #7a5cff);
+    box-shadow: 0 10px 26px rgba(88, 108, 255, 0.42);
+  }
+  .btn.primary:hover { filter: brightness(1.12); }
+  .btn.ghost {
+    color: #cfd6ff;
+    background: rgba(255, 255, 255, 0.09);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .btn.ghost:hover { background: rgba(255, 255, 255, 0.15); }
+  .btn.small {
+    padding: 9px 16px;
+    font-size: 13.5px;
+    color: #dfe4ff;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .btn.small:hover { background: rgba(255, 255, 255, 0.17); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 10px 16px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+  .hud-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 62px;
+  }
+  .hud-item .k {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: #8e9ac8;
+  }
+  .hud-item .v {
+    display: inline-block;
+    font-size: 18px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  #hud-mistakes.pulse { animation: pulseRed 0.5s ease; }
+  @keyframes pulseRed {
+    0%   { transform: scale(1);    color: #fff; }
+    30%  { transform: scale(1.55); color: #ff5c7a; }
+    100% { transform: scale(1);    color: #fff; }
+  }
+
+  /* ---------- 棋盘 ---------- */
+  .board-wrap { display: flex; justify-content: center; }
+
+  .board {
+    position: relative;
+    border-radius: 16px;
+    background-color: #161c38;
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+    background-size: var(--cell) var(--cell);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 0 46px rgba(0, 0, 0, 0.5), 0 18px 44px rgba(0, 0, 0, 0.48);
+  }
+
+  /* ---------- 箭头 ---------- */
+  .arrow {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    cursor: pointer;
+    z-index: 2;
+    transition: transform 0.55s cubic-bezier(0.33, 0.05, 0.5, 1), opacity 0.55s ease-in;
+    will-change: transform, opacity;
+  }
+  .arrow .face {
+    width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: calc(var(--cell) * 0.44);
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0, 0, 0, 0.35);
+    transition: filter 0.15s, transform 0.15s;
+  }
+  .arrow:hover .face { filter: brightness(1.2); }
+  .arrow:active .face { transform: scale(0.94); }
+
+  .arrow.up    .face { background: linear-gradient(160deg, #38bdf8, #2563eb); }
+  .arrow.down  .face { background: linear-gradient(160deg, #f472b6, #db2777); }
+  .arrow.left  .face { background: linear-gradient(160deg, #fbbf24, #d97706); }
+  .arrow.right .face { background: linear-gradient(160deg, #34d399, #059669); }
+
+  .arrow.flying { z-index: 20; pointer-events: none; }
+
+  .arrow.shake .face { animation: shake 0.42s ease; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-6px) rotate(-3deg); }
+    30% { transform: translateX(6px) rotate(3deg); }
+    45% { transform: translateX(-5px) rotate(-2deg); }
+    60% { transform: translateX(5px) rotate(2deg); }
+    80% { transform: translateX(-3px); }
+  }
+
+  .arrow.flash .face { animation: flashRed 0.42s ease; }
+  @keyframes flashRed {
+    0%, 100% { box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0, 0, 0, 0.35); }
+    40% { box-shadow: 0 0 0 4px rgba(255, 82, 82, 0.85), 0 0 24px rgba(255, 60, 60, 0.95); }
+  }
+
+  .float-miss {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--cell) * 0.42);
+    font-weight: 900;
+    color: #ff5c7a;
+    text-shadow: 0 0 12px rgba(255, 60, 100, 0.9);
+    pointer-events: none;
+    z-index: 30;
+    animation: floatUp 0.8s ease-out forwards;
+  }
+  @keyframes floatUp {
+    0%   { opacity: 0; transform: translateY(0) scale(0.6); }
+    25%  { opacity: 1; transform: translateY(-6px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-38px) scale(1); }
+  }
+
+  /* ---------- 弹窗 ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(6, 9, 20, 0.72);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+  }
+  .overlay.show { display: flex; animation: fadeIn 0.22s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .dialog {
+    width: 100%;
+    max-width: 360px;
+    padding: 28px 24px 24px;
+    text-align: center;
+    border-radius: 20px;
+    background: linear-gradient(165deg, #232b52, #171d3a);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 26px 70px rgba(0, 0, 0, 0.65);
+    animation: popIn 0.26s cubic-bezier(0.2, 1.3, 0.5, 1);
+  }
+  @keyframes popIn {
+    from { transform: scale(0.85); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+  .dlg-icon { font-size: 44px; line-height: 1; margin-bottom: 10px; }
+  .dialog h2 {
+    margin: 0 0 10px;
+    font-size: 22px;
+    background: linear-gradient(120deg, #7dd3fc, #a78bfa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .dialog p {
+    margin: 0 0 22px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #b6bfe6;
+  }
+  .dlg-btns {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .dlg-btns .btn { flex: 1 1 auto; min-width: 118px; padding: 12px 18px; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<!-- ========== 开始界面 ========== -->
+<section class="screen active" id="screen-start">
+  <div class="panel">
+    <h1>箭头大逃亡</h1>
+    <p class="sub">点一下箭头，让它飞出棋盘</p>
+    <ul class="rules">
+      <li>点击箭头：若前方路径上没有别的箭头，它会飞出棋盘并消失</li>
+      <li>若前方有箭头阻挡：无法消除，并消耗 1 次失误机会</li>
+      <li>清空本关全部箭头即可通关，失误用尽则本关失败</li>
+      <li>共 3 个关卡，每一关都有可行的通关顺序</li>
+    </ul>
+    <button class="btn primary" id="btn-start">开始游戏</button>
+  </div>
+</section>
+
+<!-- ========== 游戏界面 ========== -->
+<section class="screen" id="screen-game">
+  <header class="hud">
+    <div class="hud-item">
+      <span class="k">关卡</span>
+      <span class="v" id="hud-level">1 / 3</span>
+    </div>
+    <div class="hud-item">
+      <span class="k">剩余箭头</span>
+      <span class="v" id="hud-arrows">0</span>
+    </div>
+    <div class="hud-item">
+      <span class="k">剩余失误</span>
+      <span class="v" id="hud-mistakes">3</span>
+    </div>
+    <button class="btn small" id="btn-restart">重新开始</button>
+  </header>
+
+  <main class="board-wrap">
+    <div class="board" id="board"></div>
+  </main>
+</section>
+
+<!-- ========== 结果弹窗 ========== -->
+<div class="overlay" id="overlay">
+  <div class="dialog">
+    <div class="dlg-icon" id="dlg-icon">🎉</div>
+    <h2 id="dlg-title">标题</h2>
+    <p id="dlg-msg">内容</p>
+    <div class="dlg-btns">
+      <button class="btn primary" id="dlg-primary">确定</button>
+      <button class="btn ghost"   id="dlg-secondary">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
 
 /* =========================================================
    前端逻辑（Commit 1：棋盘与箭头渲染）
@@ -124,7 +467,7 @@ async function onArrowClick(r, c, el, dir) {
   }
 }
 
-/* 被阻挡：抖动 /
+
 function handleBlocked(el, resp) {
   const cell = game.cell;
 
@@ -175,7 +518,7 @@ function handleBlocked(el, resp) {
   }, 460);
 }
 
-/* 飞出：/
+
 function handleFlew(el, resp) {
   const cell = game.cell;
   const { dr, dc } = DIRS[resp.arrow.dir];
@@ -251,9 +594,54 @@ async function startLevel(index) {
   applyState(resp.state);
 }
 
+async function restartLevel() {
+  hideDialog();
+  const resp = await api('/api/restart', {});
+  if (!resp.ok) return;
+  showScreen('game');
+  applyState(resp.state);
+}
+
+async function nextLevel() {
+  hideDialog();
+  const resp = await api('/api/next_level', {});
+  if (!resp.ok) return;
+  showScreen('game');
+  applyState(resp.state);
+}
+
+
 /* ---------- 事件绑定 ---------- */
 document.getElementById('btn-start').addEventListener('click', () => startLevel(0));
 document.getElementById('btn-restart').addEventListener('click', () => restartLevel());
 
+window.addEventListener('resize', () => {
+  if (!game || !game.state) return;
+  if (!document.getElementById('screen-game').classList.contains('active')) return;
+
+  const oldCell = game.cell;
+  const newCell = computeCell(game.state);
+  if (newCell === oldCell) return;
+
+  game.cell = newCell;
+  const state = game.state;
+
+  boardEl.style.width  = newCell * state.cols + 'px';
+  boardEl.style.height = newCell * state.rows + 'px';
+  boardEl.style.setProperty('--cell', newCell + 'px');
+
+  [...boardEl.querySelectorAll('.arrow')].forEach(el => {
+    const r = Math.round(parseFloat(el.style.top)  / oldCell);
+    const c = Math.round(parseFloat(el.style.left) / oldCell);
+    el.style.left   = c * newCell + 'px';
+    el.style.top    = r * newCell + 'px';
+    el.style.width  = newCell + 'px';
+    el.style.height = newCell + 'px';
+  });
+});
+
 /* ---------- 初始 ---------- */
 showScreen('start');
+</script>
+</body>
+</html>
