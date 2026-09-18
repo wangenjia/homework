@@ -111,6 +111,29 @@ def index():
     return render_template(index.html, mimetype="text/html")
 
 
+@app.route("/api/restart", methods=["POST"])
+def api_restart():
+    state = CURRENT.get("state")
+    if not state:
+        return jsonify({"ok": False, "error": "no_game"}), 400
+    new_state = build_state(state["level_index"])
+    CURRENT["state"] = new_state
+    return jsonify({"ok": True, "state": public_state(new_state)})
+
+
+@app.route("/api/next_level", methods=["POST"])
+def api_next_level():
+    state = CURRENT.get("state")
+    if not state:
+        return jsonify({"ok": False, "error": "no_game"}), 400
+    nxt = state["level_index"] + 1
+    if nxt >= len(LEVELS):
+        nxt = 0
+    new_state = build_state(nxt)
+    CURRENT["state"] = new_state
+    return jsonify({"ok": True, "state": public_state(new_state)})
+
+
 @app.route("/api/click", methods=["POST"])
 def api_click():
     state = CURRENT.get("state")
