@@ -46,6 +46,7 @@ function showDialog({ icon, title, msg, primary, secondary }) {
   overlayEl.classList.add('show');
 }
 
+function hideDialog() { overlayEl.classList.remove('show'); }
 
 function computeCell(lv) {
   const availW = Math.min(window.innerWidth - 40, 460);
@@ -91,9 +92,7 @@ function addArrowEl(r, c, dir) {
   face.className = 'face';
   face.textContent = DIRS[dir].glyph;
   el.appendChild(face);
-
-  // 注意：Commit 1 不绑定点击事件
-
+  el.addEventListener('click', () => onArrowClick(r, c, el, dir));
   boardEl.appendChild(el);
 }
 
@@ -102,6 +101,14 @@ function updateHUD(state) {
   hudLevel.textContent   = (state.level_index + 1) + ' / ' + state.level_total;
   hudArrows.textContent  = state.arrows_left;
   hudMistake.textContent = state.mistakes_left;
+}
+
+/* ---------------- 应用一份新状态 ---------------- */
+function applyState(state) {
+  game.state = state;
+  renderBoard(state);
+  updateHUD(state);
+  busy = false;
 }
 
 /* ---------------- 点击箭头 ---------------- */
@@ -119,11 +126,53 @@ async function onArrowClick(r, c, el, dir) {
 
 /* 被阻挡：抖动 /
 function handleBlocked(el, resp) {
-  
+  const cell = game.cell;
+
+  // 找出被撞箭头对应的 DOM
+  const blockerPos = resp.blocker;
+  const blockerEl = [...boardEl.querySelectorAll('.arrow')].find(a => {
+    const left = parseFloat(a.style.left) / cell;
+    const top  = parseFloat(a.style.top)  / cell;
+    return Math.round(left) === blockerPos.c && Math.round(top) === blockerPos.r;
+  });
+
+  // 抖动自身
   el.classList.remove('shake');
   void el.offsetWidth;
   el.classList.add('shake');
 
+  // 被撞箭头闪红
+  if (blockerEl) {
+    blockerEl.classList.remove('flash');
+    void blockerEl.offsetWidth;
+    blockerEl.classList.add('flash');
+    setTimeout(() => blockerEl.classList.remove('flash'), 460);
+  }
+
+  // 飘字 -1
+  floatMissText(resp.arrow.r, resp.arrow.c);
+
+  // 更新失误数
+  hudMistake.textContent = resp.mistakes_left;
+  hudMistake.classList.remove('pulse');
+  void hudMistake.offsetWidth;
+  hudMistake.classList.add('pulse');
+
+  setTimeout(() => {
+    el.classList.remove('shake');
+    busy = false;
+
+    if (resp.failed) {
+      game.state = resp.state;
+      showDialog({
+        icon: '💥',
+        title: '关卡失败',
+        msg: `失误次数已用尽，本关还剩 <b>${resp.state.arrows_left}</b> 个箭头。<br>再来一次吧！`,
+        primary: { label: '重玩本关', fn: () => restartLevel() },
+        secondary: { label: '返回首页', fn: () => { hideDialog(); showScreen('start'); } },
+      });
+    }
+  }, 460);
 }
 
 /* 飞出：/
@@ -152,6 +201,7 @@ function handleFlew(el, resp) {
     el.remove();
     game.state = resp.state;
     busy = false;
+
     if (resp.cleared) {
       const isLast = resp.state.level_index + 1 >= resp.state.level_total;
       setTimeout(() => {
@@ -163,10 +213,19 @@ function handleFlew(el, resp) {
             primary: { label: '进入下一关', fn: () => nextLevel() },
             secondary: { label: '重玩本关', fn: () => restartLevel() },
           });
+        } else {
+          showDialog({
+            icon: '🏆',
+            title: '全部通关！',
+            msg: `恭喜你完成了全部 <b>${resp.state.level_total}</b> 个关卡！<br>你就是箭头大师 👏`,
+            primary: { label: '再玩一次', fn: () => startLevel(0) },
+            secondary: { label: '返回首页', fn: () => { hideDialog(); showScreen('start'); } },
+          });
         }
-      }
+      }, 200);
     }
-  }
+  }, 600);
+}
 
 
 /* ---------------- 飘字 ---------------- */
@@ -194,7 +253,7 @@ async function startLevel(index) {
 
 /* ---------- 事件绑定 ---------- */
 document.getElementById('btn-start').addEventListener('click', () => startLevel(0));
-// 重新开始按钮暂不绑定
+document.getElementById('btn-restart').addEventListener('click', () => restartLevel());
 
 /* ---------- 初始 ---------- */
 showScreen('start');
