@@ -24,6 +24,29 @@ function showScreen(name) {
   document.getElementById('screen-' + name).classList.add('active');
 }
 
+
+function showDialog({ icon, title, msg, primary, secondary }) {
+  document.getElementById('dlg-icon').textContent = icon || '';
+  document.getElementById('dlg-title').textContent = title;
+  document.getElementById('dlg-msg').innerHTML = msg || '';
+
+  const pBtn = document.getElementById('dlg-primary');
+  const sBtn = document.getElementById('dlg-secondary');
+
+  pBtn.textContent = primary.label;
+  pBtn.onclick = primary.fn;
+
+  if (secondary) {
+    sBtn.style.display = '';
+    sBtn.textContent = secondary.label;
+    sBtn.onclick = secondary.fn;
+  } else {
+    sBtn.style.display = 'none';
+  }
+  overlayEl.classList.add('show');
+}
+
+
 function computeCell(lv) {
   const availW = Math.min(window.innerWidth - 40, 460);
   const availH = window.innerHeight - 250;
@@ -129,11 +152,40 @@ function handleFlew(el, resp) {
     el.remove();
     game.state = resp.state;
     busy = false;
-  }, 600);
+    if (resp.cleared) {
+      const isLast = resp.state.level_index + 1 >= resp.state.level_total;
+      setTimeout(() => {
+        if (!isLast) {
+          showDialog({
+            icon: '🎉',
+            title: '通关成功',
+            msg: `第 <b>${resp.state.level_index + 1}</b> 关完成！<br>剩余失误 <b>${resp.state.mistakes_left}</b> 次。`,
+            primary: { label: '进入下一关', fn: () => nextLevel() },
+            secondary: { label: '重玩本关', fn: () => restartLevel() },
+          });
+        }
+      }
+    }
+  }
+
+
+/* ---------------- 飘字 ---------------- */
+function floatMissText(r, c) {
+  const cell = game.cell;
+  const el = document.createElement('div');
+  el.className = 'float-miss';
+  el.textContent = '-1';
+  el.style.left   = c * cell + 'px';
+  el.style.top    = r * cell + 'px';
+  el.style.width  = cell + 'px';
+  el.style.height = cell + 'px';
+  boardEl.appendChild(el);
+  setTimeout(() => el.remove(), 820);
 }
 
-/* ---------- 关卡启动 ---------- */
+/* ---------------- 生命周期 ---------------- */
 async function startLevel(index) {
+  hideDialog();
   const resp = await api('/api/start', { index });
   if (!resp.ok) return;
   showScreen('game');
