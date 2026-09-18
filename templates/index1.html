@@ -1,0 +1,104 @@
+
+/* =========================================================
+   前端逻辑（Commit 1：棋盘与箭头渲染）
+   ========================================================= */
+const DIRS = {
+  up:    { dr: -1, dc:  0, glyph: '↑' },
+  down:  { dr:  1, dc:  0, glyph: '↓' },
+  left:  { dr:  0, dc: -1, glyph: '←' },
+  right: { dr:  0, dc:  1, glyph: '→' },
+};
+
+const boardEl    = document.getElementById('board');
+const overlayEl  = document.getElementById('overlay');
+const hudLevel   = document.getElementById('hud-level');
+const hudArrows  = document.getElementById('hud-arrows');
+const hudMistake = document.getElementById('hud-mistakes');
+
+let game = { state: null, cell: 0 };
+let busy = false;
+
+/* ---------- 通用工具 ---------- */
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+}
+
+function computeCell(lv) {
+  const availW = Math.min(window.innerWidth - 40, 460);
+  const availH = window.innerHeight - 250;
+  const byW = availW / lv.cols;
+  const byH = Math.max(availH, 200) / lv.rows;
+  return Math.max(38, Math.min(Math.floor(Math.min(byW, byH)), 78));
+}
+
+/* ---------- 与后端通信 ---------- */
+async function api(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+  return res.json();
+}
+
+/* ---------- 渲染棋盘 ---------- */
+function renderBoard(state) {
+  const cell = computeCell(state);
+  game.cell = cell;
+
+  boardEl.style.width  = cell * state.cols + 'px';
+  boardEl.style.height = cell * state.rows + 'px';
+  boardEl.style.setProperty('--cell', cell + 'px');
+  boardEl.innerHTML = '';
+
+  state.arrows.forEach(a => addArrowEl(a.r, a.c, a.dir));
+}
+
+function addArrowEl(r, c, dir) {
+  const cell = game.cell;
+  const el = document.createElement('div');
+  el.className = 'arrow ' + dir;
+  el.style.left   = c * cell + 'px';
+  el.style.top    = r * cell + 'px';
+  el.style.width  = cell + 'px';
+  el.style.height = cell + 'px';
+
+  const face = document.createElement('div');
+  face.className = 'face';
+  face.textContent = DIRS[dir].glyph;
+  el.appendChild(face);
+
+  // 注意：Commit 1 不绑定点击事件
+
+  boardEl.appendChild(el);
+}
+
+/* ---------- HUD 与状态 ---------- */
+function updateHUD(state) {
+  hudLevel.textContent   = (state.level_index + 1) + ' / ' + state.level_total;
+  hudArrows.textContent  = state.arrows_left;
+  hudMistake.textContent = state.mistakes_left;
+}
+
+function applyState(state) {
+  game.state = state;
+  renderBoard(state);
+  updateHUD(state);
+  busy = false;
+}
+
+/* ---------- 关卡启动 ---------- */
+async function startLevel(index) {
+  const resp = await api('/api/start', { index });
+  if (!resp.ok) return;
+  showScreen('game');
+  applyState(resp.state);
+}
+
+/* ---------- 事件绑定 ---------- */
+document.getElementById('btn-start').addEventListener('click', () => startLevel(0));
+// 重新开始按钮暂不绑定
+
+/* ---------- 初始 ---------- */
+showScreen('start');
