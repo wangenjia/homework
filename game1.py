@@ -1,7 +1,7 @@
 
 
 import copy
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, render_template
 app = Flask(__name__)
 
 DIRS = {
@@ -74,6 +74,26 @@ def build_state(idx: int) -> dict:
         "locked":         False,
     }
 
+def arrow_at(state, r, c):
+    for a in state["arrows"]:
+        if a["r"] == r and a["c"] == c:
+            return a
+    return None
+
+def find_blocker(state, arrow):
+    dr = DIRS[arrow["dir"]]["dr"]
+    dc = DIRS[arrow["dir"]]["dc"]
+    r = arrow["r"] + dr
+    c = arrow["c"] + dc
+    while 0 <= r < state["rows"] and 0 <= c < state["cols"]:
+        hit = arrow_at(state, r, c)
+        if hit:
+            return hit
+        r += dr
+        c += dc
+    return None
+
+
 def public_state(state):
     return {
         "level_index":   state["level_index"],
@@ -86,3 +106,61 @@ def public_state(state):
         "locked":        state["locked"],
     }
 
+@app.route("/")
+def index():
+    return render_template(index.html, mimetype="text/html")
+
+
+@app.route("/api/click", methods=["POST"])
+def api_click():
+    state = CURRENT.get("state")
+    if not state:
+        return jsonify({"ok": False, "error": "no_game"}), 400
+
+    if state["locked"]:
+        return jsonify({"ok": False, "error": "locked",
+                        "state": public_state(state)})
+
+    data = request.get_json(silent=True) or {}
+    r, c = data.get("r"), data.get("c")
+    if r is None or c is None:
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+
+    arrow = arrow_at(state, r, c)
+    if arrow is None:
+        return jsonify({"ok": False, "error": "empty",
+                        "state": public_state(state)})
+
+    blocker = find_blocker(state, arrow)
+
+    if blocker is not None:
+        state["mistakes_left"] -= 1
+        failed = state["mistakes_left"] <= 0
+        if failed:
+            state["locked"] = True
+        return jsonify({
+            "ok":            True,
+            "result":        "blocked",
+            "arrow":         arrow,
+            "blocker":       blocker,
+            "mistakes_left": state["mistakes_left"],
+            "failed":        failed,
+            "state":         public_state(state),
+        })
+
+    state["arrows"] = [a for a in state["arrows"]
+                       if not (a["r"] == r and a["c"] == c)]
+    cleared = (len(state["arrows"]) == 0)
+    completed = cleared and (state["level_index"] + 1 >= len(LEVELS))
+    if cleared:
+        state["locked"] = True
+
+    return jsonify({
+        "ok":          True,
+        "result":      "flew",
+        "arrow":       arrow,
+        "arrows_left": len(state["arrows"]),
+        "cleared":     cleared,
+        "completed":   completed,
+        "state":       public_state(state),
+    })
