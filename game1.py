@@ -108,8 +108,20 @@ def public_state(state):
 
 @app.route("/")
 def index():
-    return render_template(index.html, mimetype="text/html")
+    return render_template("index.html", mimetype="text/html")
 
+
+@app.route("/api/start", methods=["POST"])
+def api_start():
+    data = request.get_json(silent=True) or {}
+    try:
+        idx = int(data.get("index", 0))
+    except (TypeError, ValueError):
+        idx = 0
+    if idx < 0 or idx >= len(LEVELS):
+        idx = 0
+    CURRENT["state"] = build_state(idx)
+    return jsonify({"ok": True, "state": public_state(CURRENT["state"])})
 
 @app.route("/api/restart", methods=["POST"])
 def api_restart():
@@ -187,3 +199,18 @@ def api_click():
         "completed":   completed,
         "state":       public_state(state),
     })
+
+# ============================================================
+# 6. 启动
+# ============================================================
+if __name__ == "__main__":
+    # 启动前自检：确认每一关都有箭头
+    for i, lv in enumerate(LEVELS):
+        assert lv["arrows"], "第 " + str(i + 1) + " 关没有箭头！"
+    total = sum(len(lv["arrows"]) for lv in LEVELS)
+    print("=" * 52)
+    print("  箭头大逃亡已启动")
+    print("  共", len(LEVELS), "个关卡，共", total, "个箭头")
+    print("  请打开： http://127.0.0.1:5000")
+    print("=" * 52)
+    app.run(host="0.0.0.0", port=5000, debug=True)
